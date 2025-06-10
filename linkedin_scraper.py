@@ -1,75 +1,41 @@
-from serpapi import GoogleSearch
-import config
-import json
-from typing import List, Dict
+import requests
+from bs4 import BeautifulSoup
 import time
+import random
 
 class LinkedInScraper:
     def __init__(self):
-        self.api_key = config.SERPAPI_API_KEY
-        if not self.api_key:
-            raise ValueError("SERPAPI_API_KEY not found in environment variables")
-
-    def search_posts(self, keywords: str, tags: str = None) -> List[Dict]:
-        """
-        Search for LinkedIn posts using SerpAPI
-        
-        Args:
-            keywords (str): Search keywords
-            tags (str, optional): Additional tags to filter by
-            
-        Returns:
-            List[Dict]: List of post data including title, snippet, link, etc.
-        """
-        query = f'site:linkedin.com/posts "{keywords}"'
-        if tags:
-            query += f' "{tags}"'
-
-        params = {
-            "engine": "google",
-            "q": query,
-            "api_key": self.api_key,
-            "num": config.MAX_POSTS
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
+        self.min_delay = 2
+        self.max_delay = 5
 
+    def _add_delay(self):
+        """Add random delay between requests"""
+        delay = random.uniform(self.min_delay, self.max_delay)
+        time.sleep(delay)
+
+    def scrape_post(self, url: str) -> dict:
+        """Scrape a LinkedIn post URL"""
         try:
-            search = GoogleSearch(params)
-            results = search.get_dict()
+            self._add_delay()
+            response = requests.get(url, headers=self.headers)
+            response.raise_for_status()
             
-            if "error" in results:
-                raise Exception(f"SerpAPI Error: {results['error']}")
-
-            posts = []
-            if "organic_results" in results:
-                for result in results["organic_results"]:
-                    post = {
-                        "title": result.get("title", ""),
-                        "snippet": result.get("snippet", ""),
-                        "link": result.get("link", ""),
-                        "date": result.get("date", ""),
-                        "position": result.get("position", 0)
-                    }
-                    posts.append(post)
-
-            return posts
-
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract post text
+            post_text = soup.find('div', {'class': 'feed-shared-update-v2__description'})
+            if post_text:
+                post_text = post_text.get_text(strip=True)
+            else:
+                return None
+            
+            return {
+                'text': post_text,
+                'url': url
+            }
+            
         except Exception as e:
-            print(f"Error searching posts: {str(e)}")
-            return []
-
-    def extract_post_data(self, post: Dict) -> Dict:
-        """
-        Extract relevant data from a post
-        
-        Args:
-            post (Dict): Raw post data from SerpAPI
-            
-        Returns:
-            Dict: Processed post data
-        """
-        return {
-            "post_text": f"{post['title']} {post['snippet']}",
-            "post_url": post["link"],
-            "post_date": post["date"],
-            "post_position": post["position"]
-        } 
+            return None 

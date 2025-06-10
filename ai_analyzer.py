@@ -52,7 +52,6 @@ class AIAnalyzer:
                         analysis = json.loads(response.text)
                         return analysis
                     except json.JSONDecodeError:
-                        # If response is not valid JSON, return default analysis
                         return DEFAULT_ANALYSIS
                 else:
                     return DEFAULT_ANALYSIS
